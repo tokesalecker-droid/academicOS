@@ -1,3 +1,4 @@
+import { createFirestoreRepository } from "../storage/firestoreRepository.js";
 import {
   EVENT_TYPES,
   GRADE_AREAS,
@@ -15,7 +16,6 @@ import {
   calculateSubjectGrade,
   calculateSubjectStats,
   createEmptyAcademicOSData,
-  createLocalStorageRepository,
   exportData,
   formatCountdown,
   getEventsForSchoolYear,
@@ -34,7 +34,7 @@ import {
 import { icon } from "./icons.js";
 
 const app = document.querySelector("#app");
-const repository = createLocalStorageRepository(window.localStorage);
+const repository = createFirestoreRepository();
 
 const tabs = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
@@ -71,7 +71,7 @@ const eventLabels = {
 };
 
 let state = {
-  data: loadInitialData(),
+  data: createEmptyAcademicOSData(),
   activeTab: "dashboard",
   addMode: "grade",
   subjectSort: "alphabetical",
@@ -80,11 +80,17 @@ let state = {
   toast: null
 };
 
-render();
+// Zeige Ladescreen während Firestore lädt
+app.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#fff;font-family:sans-serif;">Laden…</div>`;
 
-function loadInitialData() {
+loadInitialData().then((data) => {
+  state.data = data;
+  render();
+});
+
+async function loadInitialData() {
   try {
-    const data = repository.load();
+    const data = await repository.load();
     if (Object.keys(data.entities.schoolYears).length > 0) return data;
     return createStarterData(data);
   } catch (error) {
@@ -900,9 +906,9 @@ async function handleImport(event) {
   }
 }
 
-function commit(data, message = "") {
+async function commit(data, message = "") {
   try {
-    repository.save(data);
+    await repository.save(data);
     state.data = data;
     if (message) showToast(message);
     render();
